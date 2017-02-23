@@ -7,8 +7,9 @@ class Data:
     endpoints = []
     requests = []
 
-    def __init__(self):
-        with open('input/me_at_the_zoo.in', 'r') as f:
+    def __init__(self, filename):
+        self.filename = filename
+        with open('input/%s.in' % filename, 'r') as f:
             (
                 self.count['videos'],
                 self.count['endpoints'],
@@ -76,11 +77,11 @@ class Data:
 
     def get_most_requested_video(self, cache_id):
         cache = self.caches[cache_id]
+        # print(json.dumps(cache, indent=4))
         max_weight = 0
         most_requested_video_id = 0
         for video_id, weight in cache['candidate_videos'].items():
             if int(weight) > max_weight:
-                print(int(weight), max_weight)
                 most_requested_video_id = video_id
                 max_weight = int(weight)
         return most_requested_video_id
@@ -99,12 +100,20 @@ class Data:
     def print_caches(self):
         print(json.dumps(self.caches[:1], indent=4))
 
+    def export(self):
+        with open('output/%s.out' % self.filename, 'w') as f:
+            f.write(str(len(self.caches)) + '\n')
+            for cache_id, cache in enumerate(self.caches):
+                video_ids = ' '.join(map(str, (cache['assigned_videos'].keys())))
+                f.write(str(cache_id) + ' ' + video_ids + '\n')
+
 
 if __name__ == "__main__":
-    d = Data()
-    d.ponderate_cache()
-    for trial in range(1):
-        for cache_id, cache in enumerate(d.caches[:1]):
-            video_id = d.get_most_requested_video(cache_id)
-            d.assign_video_to_cache(video_id, cache_id)
-    d.print_caches()
+    for filename in ('me_at_the_zoo', 'trending_today', 'videos_worth_spreading', 'kittens'):
+        d = Data(filename)
+        d.ponderate_cache()
+        for trial in range(min(10, int(d.count['videos'] / 10))):
+            for cache_id, cache in enumerate(d.caches):
+                video_id = d.get_most_requested_video(cache_id)
+                d.assign_video_to_cache(video_id, cache_id)
+        d.export()
