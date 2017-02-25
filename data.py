@@ -2,6 +2,7 @@ import json
 
 
 class Data:
+    """Data"""
     count = {}
     videos = []
     endpoints = []
