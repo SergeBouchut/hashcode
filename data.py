@@ -1,5 +1,61 @@
 import json
 
+from copy import copy
+
+
+class Video:
+    pass
+
+
+class Endpoint:
+    pass
+
+
+class Request:
+    pass
+
+
+class Cache:
+    pass
+
+
+class ItemsManager:
+    def __init__(self, allowed_type):
+        self.items = []
+        self.count = 0
+        self.allowed_type = allowed_type
+
+    def add(self, item):
+        if type(item) is not self.allowed_type:
+            raise Exception('Item type not allowed')
+        self.items.append(item)
+        self.count += 1
+
+    def get(self, index):
+        if index not in range(self.count):
+            raise Exception('Index out of range')
+        return self.items[index]
+
+    def pop(self, index):
+        if index not in range(self.count):
+            raise Exception('Index out of range')
+        return self.pop(index)
+
+    def remove(self, index):
+        if index not in range(self.count):
+            raise Exception('Index out of range')
+        self.pop(index)
+
+    def sort(self, attribute):
+        pass
+
+    def copy(self):
+        return copy(self)
+
+    def load(self, values):
+        for value in values:
+            self.add(self.allowed_type(value))
+
 
 class Data:
     """Data"""
