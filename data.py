@@ -5,9 +5,11 @@ class Cache:
         self.assigned_videos = []
 
     def assign_video(self, video):
-        if video.id not in self.assigned_videos:
-            self.assigned_videos.append(video.id)
-            self.available_size -= video.size
+        if video.size > self.available_size or video.id in self.assigned_videos:
+            return False
+        self.assigned_videos.append(video.id)
+        self.available_size -= video.size
+        return True
 
 
 class Video:
@@ -129,9 +131,7 @@ if __name__ == "__main__":
         for request in sorted_requests:
             for item in request.endpoint.sorted_caches_latency:
                 cache = item['cache']
-                # check available size on cache
-                if request.video.size < cache.available_size:
-                    cache.assign_video(request.video)
+                if cache.assign_video(request.video):
                     break
 
         # write output data
