@@ -1,176 +1,138 @@
-import json
+class Cache:
+    def __init__(self, id, size):
+        self.id = id
+        self.available_size = size
+        self.assigned_videos = []
 
-from copy import copy
+    def assign_video(self, video):
+        if video.id not in self.assigned_videos:
+            self.assigned_videos.append(video.id)
+            self.available_size -= video.size
 
 
 class Video:
-    pass
+    def __init__(self, id, size):
+        self.id = id
+        self.size = size
+        self.requests = {}
 
 
 class Endpoint:
-    pass
+    def __init__(self, latency):
+        self.datacenter_latency = latency
+        self.caches_latency = []
+
+    def add_cache_latency(self, cache, latency):
+        self.caches_latency.append({
+            'cache': cache,
+            'latency': latency
+        })
+
+    def sort_caches_by_latency(self):
+        self.sorted_caches_latency = sorted(
+            self.caches_latency,
+            key=lambda item: item['latency'],
+        )
 
 
 class Request:
-    pass
+    def __init__(self, video, endpoint, count):
+        self.video = video
+        self.endpoint = endpoint
+        self.count = count
+
+    def compute_cost(self):
+        self.cost = self.count * self.video.size * self.endpoint.datacenter_latency
 
 
-class Cache:
-    pass
+def input_reader(filename, caches, videos, endpoints, requests):
+    with open('input/%s.in' % filename, 'r') as f:
+        # global data
+        (
+            videos_count,
+            endpoints_count,
+            requests_count,
+            caches_count,
+            caches_size,
+        ) = map(int, f.readline().split())
+
+        # cache data
+        for id in range(caches_count):
+            caches.append(Cache(id, caches_size))
+
+        # video data
+        for id, size in enumerate(map(int, f.readline().split())):
+            videos.append(Video(id, size))
+
+        # endpoint data
+        for line in range(endpoints_count):
+            datacenter_latency, caches_count = map(int, f.readline().split())
+            endpoint = Endpoint(datacenter_latency)
+            # endpoint-cache data
+            for sub_line in range(caches_count):
+                cache_id, cache_latency = map(int, f.readline().split())
+                endpoint.add_cache_latency(caches[cache_id], cache_latency)
+            # sort cache from lower to higher latency
+            endpoint.sort_caches_by_latency()
+            endpoints.append(endpoint)
+
+        # request data
+        for line in range(requests_count):
+            video_id, endpoint_id, requests_count = map(int, f.readline().split())
+            requests.append(
+                Request(
+                    videos[video_id],
+                    endpoints[endpoint_id],
+                    requests_count,
+                )
+            )
 
 
-class ItemsManager:
-    def __init__(self, allowed_type):
-        self.items = []
-        self.count = 0
-        self.allowed_type = allowed_type
-
-    def add(self, item):
-        if type(item) is not self.allowed_type:
-            raise Exception('Item type not allowed')
-        self.items.append(item)
-        self.count += 1
-
-    def get(self, index):
-        if index not in range(self.count):
-            raise Exception('Index out of range')
-        return self.items[index]
-
-    def pop(self, index):
-        if index not in range(self.count):
-            raise Exception('Index out of range')
-        return self.pop(index)
-
-    def remove(self, index):
-        if index not in range(self.count):
-            raise Exception('Index out of range')
-        self.pop(index)
-
-    def sort(self, attribute):
-        pass
-
-    def copy(self):
-        return copy(self)
-
-    def load(self, values):
-        for value in values:
-            self.add(self.allowed_type(value))
-
-
-class Data:
-    """Data"""
-    count = {}
-    videos = []
-    endpoints = []
-    requests = []
-
-    def __init__(self, filename):
-        self.filename = filename
-        with open('input/%s.in' % filename, 'r') as f:
-            (
-                self.count['videos'],
-                self.count['endpoints'],
-                self.count['requests'],
-                self.count['cache'],
-                self.count['cache_size']
-            ) = f.readline().split(' ')
-            for k, v in self.count.items():
-                self.count[k] = int(v)
-
-            for video_size in f.readline().split(' '):
-                self.videos.append({
-                    'size': int(video_size),
-                    'requests': {},
-                })
-
-            # self.endpoints = [{
-            #     'latency_to_datacenter': 1000,
-            #     'caches': {
-            #           '0': 100,
-            #           '1': 200,
-            #        }
-            # }]
-
-            for endpoint in range(int(self.count['endpoints'])):
-                latency_to_datacenter, cache_count = f.readline().split(' ')
-                caches = {}
-                for cache in range(int(cache_count)):
-                    cache_id, cache_distance = f.readline().split(' ')
-                    caches[cache_id] = cache_distance.replace("\n", "")
-                self.endpoints.append({
-                    'latency_to_datacenter': latency_to_datacenter,
-                    'caches': caches,
-                })
-
-            for request in range(int(self.count['requests'])):
-                video_id, endpoint_id, request_count = f.readline().split(' ')
-                self.requests.append({
-                    'video_id': video_id,
-                    'endpoint_id': endpoint_id,
-                    'count': int(request_count),
-                })
-                self.videos[int(video_id)]['requests'][int(endpoint_id)] = int(request_count)
-
-    def get_video_size(self, video_id):
-        return int(self.videos[int(video_id)]['size'])
-
-    def ponderate_cache(self):
-        self.caches = []
-        for cache_id in range(self.count['cache']):
-            self.caches.append({
-                'remaining_size': self.count['cache_size'],
-                'candidate_videos': {},
-                'assigned_videos': {},
-            })
-        for request in self.requests:
-            video_id = int(request['video_id'])
-            endpoint_id = int(request['endpoint_id'])
-            weight = request['count'] * self.get_video_size(video_id)
-            endpoint = self.endpoints[endpoint_id]
-            for cache_id, cache_latency in endpoint['caches'].items():
-                old_weight = self.caches[int(cache_id)]['candidate_videos'].get(video_id, 0)
-                self.caches[int(cache_id)]['candidate_videos'][video_id] = (
-                    (old_weight + weight) / int(cache_latency))
-
-    def get_most_requested_video(self, cache_id):
-        cache = self.caches[cache_id]
-        # print(json.dumps(cache, indent=4))
-        max_weight = 0
-        most_requested_video_id = 0
-        for video_id, weight in cache['candidate_videos'].items():
-            if int(weight) > max_weight:
-                most_requested_video_id = video_id
-                max_weight = int(weight)
-        return most_requested_video_id
-
-    def assign_video_to_cache(self, video_id, cache_id):
-        video_size = self.get_video_size(video_id)
-        cache = self.caches[cache_id]
-        if video_size < cache['remaining_size']:
-            cache['assigned_videos'][video_id] = video_size
-            cache['candidate_videos'].pop(video_id)
-            cache['remaining_size'] -= video_size
-
-    def print_counts(self):
-        print(self.count)
-
-    def print_caches(self):
-        print(json.dumps(self.caches[:1], indent=4))
-
-    def export(self):
-        with open('output/%s.out' % self.filename, 'w') as f:
-            f.write(str(len(self.caches)) + '\n')
-            for cache_id, cache in enumerate(self.caches):
-                video_ids = ' '.join(map(str, (cache['assigned_videos'].keys())))
-                f.write(str(cache_id) + ' ' + video_ids + '\n')
+def output_writer(filename, caches):
+    with open('output/%s.out' % filename, 'w') as f:
+        f.write('%d\n' % len(caches))
+        for cache in caches:
+            f.write('%d %s\n' % (
+                cache.id,
+                ' '.join(map(str, cache.assigned_videos))
+            ))
 
 
 if __name__ == "__main__":
-    for filename in ('me_at_the_zoo', 'trending_today', 'videos_worth_spreading', 'kittens'):
-        d = Data(filename)
-        d.ponderate_cache()
-        for trial in range(min(10, int(d.count['videos'] / 10))):
-            for cache_id, cache in enumerate(d.caches):
-                video_id = d.get_most_requested_video(cache_id)
-                d.assign_video_to_cache(video_id, cache_id)
-        d.export()
+    for filename in (
+        'me_at_the_zoo',
+        'trending_today',
+        'videos_worth_spreading',
+        'kittens',
+    ):
+        # init data
+        caches = []
+        videos = []
+        endpoints = []
+        requests = []
+
+        # read input data
+        input_reader(filename, caches, videos, endpoints, requests)
+
+        # compute cost for each request
+        for request in requests:
+            request.compute_cost()
+
+        # sort request from higher to lower cost
+        sorted_requests = sorted(
+            requests,
+            key=lambda request: request.cost,
+            reverse=True,
+        )
+
+        # find best cache to assigned to video
+        for request in sorted_requests:
+            for item in request.endpoint.sorted_caches_latency:
+                cache = item['cache']
+                # check available size on cache
+                if request.video.size < cache.available_size:
+                    cache.assign_video(request.video)
+                    break
+
+        # write output data
+        output_writer(filename, caches)
