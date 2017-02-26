@@ -16,7 +16,6 @@ class Video:
     def __init__(self, id, size):
         self.id = id
         self.size = size
-        self.requests = {}
 
 
 class Endpoint:
@@ -31,10 +30,14 @@ class Endpoint:
         })
 
     def sort_caches_by_latency(self):
-        self.sorted_caches_latency = sorted(
-            self.caches_latency,
-            key=lambda item: item['latency'],
-        )
+        self.sorted_caches = [
+            item['cache']
+            for item
+            in sorted(
+                self.caches_latency,
+                key=lambda item: item['latency'],
+            )
+        ]
 
 
 class Request:
@@ -129,8 +132,7 @@ if __name__ == "__main__":
 
         # find best cache to assigned to video
         for request in sorted_requests:
-            for item in request.endpoint.sorted_caches_latency:
-                cache = item['cache']
+            for cache in request.endpoint.sorted_caches:
                 if cache.assign_video(request.video):
                     break
 
