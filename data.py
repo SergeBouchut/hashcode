@@ -4,9 +4,15 @@ class Cache:
         self.available_size = size
         self.assigned_videos = []
 
-    def assign_video(self, video):
+    def assign_video(self, request):
+        video = request.video
+        # check video not already in cache
         if video.size > self.available_size or video.id in self.assigned_videos:
             return False
+        # check video not already in another cache for the endpoint
+        for cache in request.endpoint.sorted_caches:
+            if video.id in cache.assigned_videos:
+                return False
         self.assigned_videos.append(video.id)
         self.available_size -= video.size
         return True
@@ -21,21 +27,20 @@ class Video:
 class Endpoint:
     def __init__(self, latency):
         self.datacenter_latency = latency
-        self.caches_latency = []
+        self.caches = []
 
     def add_cache_latency(self, cache, latency):
-        self.caches_latency.append({
+        self.caches.append({
             'cache': cache,
-            'latency': latency
+            'gain': self.datacenter_latency - latency,
         })
 
     def sort_caches_by_latency(self):
         self.sorted_caches = [
-            item['cache']
-            for item
-            in sorted(
-                self.caches_latency,
-                key=lambda item: item['latency'],
+            item['cache'] for item in sorted(
+                self.caches,
+                key=lambda item: item['gain'],
+                reverse=True,
             )
         ]
 
@@ -103,7 +108,7 @@ def output_writer(filename, caches):
             ))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     for filename in (
         'me_at_the_zoo',
         'trending_today',
@@ -133,7 +138,7 @@ if __name__ == "__main__":
         # find best cache to assigned to video
         for request in sorted_requests:
             for cache in request.endpoint.sorted_caches:
-                if cache.assign_video(request.video):
+                if cache.assign_video(request):
                     break
 
         # write output data
