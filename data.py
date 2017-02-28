@@ -25,7 +25,7 @@ class Video:
     def __init__(self, id, size):
         self.id = id
         self.size = size
-        self.requests = []
+        self.requests_cost = 0
 
 
 class Endpoint:
@@ -52,22 +52,17 @@ class Endpoint:
 class Request:
     def __init__(self, video, endpoint, count):
         self.video = video
-        self.video.requests.append(self)
+        # self.video.requests.append(self)
         self.endpoint = endpoint
         self.count = count
 
     def compute_cost(self):
         self.cost = self.count * self.video.size * self.endpoint.datacenter_latency
+        self.video.requests_cost += self.cost
 
-    def compute_cumulated_cost(self):
-        self.cumulated_cost = 0
-        # add request cost on same video for other endpoint sharing cache
-        for request in self.video.requests:
-            if any([
-                cache_id in self.endpoint.sorted_caches
-                for cache_id in request.endpoint.sorted_caches
-            ]):
-                self.cumulated_cost += request.cost
+    def compute_cumulated_cost(self, videos_count):
+        # add request cost on same video for other endpoint
+        self.cumulated_cost = videos_count / 500 * self.cost + self.video.requests_cost
 
 
 def input_reader(filename, caches, videos, endpoints, requests):
@@ -142,20 +137,31 @@ if __name__ == '__main__':
         input_reader(filename, caches, videos, endpoints, requests)
 
         # compute cost for each request
-        for request in requests:
-            request.compute_cost()
-
-        # compute cumulated cost for each request
         percent = len(requests) / 100
         for index, request in enumerate(requests):
             if index % percent == 0:
                 print(
-                    '%s --> %02d%%' % (
+                    '%s %s %s --> %02d%%' % (
                         datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        filename,
+                        'compute_cost',
                         index / percent,
                     )
                 )
-            request.compute_cumulated_cost()
+            request.compute_cost()
+
+        # compute cumulated cost for each request
+        for index, request in enumerate(requests):
+            if index % percent == 0:
+                print(
+                    '%s %s %s --> %02d%%' % (
+                        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        filename,
+                        'compute_cumulated_cost',
+                        index / percent,
+                    )
+                )
+            request.compute_cumulated_cost(len(videos))
 
         # sort request from higher to lower cost
         sorted_requests = sorted(
@@ -165,7 +171,16 @@ if __name__ == '__main__':
         )
 
         # find best cache to assigned to video
-        for request in sorted_requests:
+        for index, request in enumerate(sorted_requests):
+            if index % percent == 0:
+                print(
+                    '%s %s %s --> %02d%%' % (
+                        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        filename,
+                        'assign_best_cache',
+                        index / percent,
+                    )
+                )
             for cache_id in request.endpoint.sorted_caches:
                 if caches[cache_id].assign_video(request, caches):
                     break
