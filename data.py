@@ -29,15 +29,21 @@ class Video:
 
 
 class Endpoint:
-    def __init__(self, latency):
-        self.datacenter_latency = latency
+    def __init__(self, datacenter_latency, total_caches_count):
+        self.datacenter_latency = datacenter_latency
         self.caches = []
+        self.best_gain = 0
+        self.unbound_caches_count = total_caches_count
 
-    def add_cache_latency(self, cache, latency):
+    def add_cache_latency(self, cache, cache_latency):
+        gain = self.datacenter_latency - cache_latency
+        if gain > self.best_gain:
+            self.best_gain = gain
         self.caches.append({
             'id': cache.id,
-            'gain': self.datacenter_latency - latency,
+            'gain': gain,
         })
+        self.unbound_caches_count -= 1
 
     def sort_caches_by_latency(self):
         self.sorted_caches = [
@@ -52,17 +58,22 @@ class Endpoint:
 class Request:
     def __init__(self, video, endpoint, count):
         self.video = video
-        # self.video.requests.append(self)
         self.endpoint = endpoint
         self.count = count
 
     def compute_cost(self):
-        self.cost = self.count * self.video.size * self.endpoint.datacenter_latency
+        # cost including endpoint potential latency max gain * endpoint isolation factor
+        self.cost = (
+            self.count *
+            self.video.size *
+            self.endpoint.best_gain *
+            self.endpoint.unbound_caches_count
+        )
         self.video.requests_cost += self.cost
 
     def compute_cumulated_cost(self, videos_count):
         # add request cost on same video for other endpoint
-        self.cumulated_cost = videos_count / 500 * self.cost + self.video.requests_cost
+        self.cumulated_cost = (videos_count / 100) * self.cost + self.video.requests_cost
 
 
 def input_reader(filename, caches, videos, endpoints, requests):
@@ -87,7 +98,7 @@ def input_reader(filename, caches, videos, endpoints, requests):
         # endpoint data
         for line in range(endpoints_count):
             datacenter_latency, caches_count = map(int, f.readline().split())
-            endpoint = Endpoint(datacenter_latency)
+            endpoint = Endpoint(datacenter_latency, caches_count)
             # endpoint-cache data
             for sub_line in range(caches_count):
                 cache_id, cache_latency = map(int, f.readline().split())
